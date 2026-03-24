@@ -1,53 +1,23 @@
-# Quick Start
+# NEAR + Nostr Integration - TypeScript Implementation
 
-## Deploy in 5 Minutes
+>>>>>>> Build in 5 minutes
+>>>>>>> TypeScript implementation with proper types and 
+- `npm run build` - Type check (0 errors)
+- `npm run deploy` - Deploy to Cloudflare
 
-```bash
-# 1. Clone
-git clone https://github.com/Kampouse/nostr-on-near.git
-cd nostr-on-near
+---
 
-# 2. Install
-npm install
+## What's Included
 
-# 3. Configure
-cp .dev.vars.example .dev.vars
-# Edit .dev.vars with your NEAR relayer credentials
+>>>>>>> README.md - Complete documentation
+- DEPLOY.md - Step-by-step deployment guide
+- QUICKSTART.md - 5-minute setup
+- worker.ts - TypeScript worker implementation (NIP-46 server)
+- test-client.js - Test client
+- tsconfig.json - TypeScript configuration
+- package.json - Dependencies
 
-# 4. Deploy
-npm run deploy
+- wrangler.toml - Cloudflare config
+- .dev.vars.example - Environment template
+- .gitignore - Git ignore rules
 
-# 5. Use
-# In any Nostr client, add remote signer:
-# bunker://alice.near@nostr-on-near.your-subdomain.workers.dev
-```
-
-## What You Get
-
-✅ Every NEAR account = Nostr identity
-✅ Zero key management
-✅ Gasless signing
-✅ Works with Damus, Snort, Amethyst, etc.
-
-## Architecture
-
-```
-User → Nostr Client → Bunker (Cloudflare) → NEAR MPC → Signed Event
-```
-
-## Files
-
-- `worker.js` - Main Cloudflare Worker (NIP-46 server)
-- `wrangler.toml` - Deployment config
-- `test-client.js` - Test script
-- `README.md` - Full documentation
-- `DEPLOY.md` - Step-by-step deployment guide
-
-## Cost
-
-$0-1/month (FREE Cloudflare tier + minimal NEAR gas)
-
-## Support
-
-- GitHub: https://github.com/Kampouse/nostr-on-near
-- Issues: https://github.com/Kampouse/nostr-on-near/issues

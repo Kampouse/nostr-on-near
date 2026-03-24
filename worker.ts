@@ -1,9 +1,64 @@
 /**
  * NEAR + Nostr Bunker Server (NIP-46)
  * Deployable on Cloudflare Workers
+ * TypeScript Implementation
  * 
  * Every NEAR account gets a deterministic Nostr identity
  */
+
+// ============================================
+// TYPE DEFINITIONS
+// ============================================
+
+interface Env {
+  RELAYER_ACCOUNT_ID: string;
+  RELAYER_PRIVATE_KEY: string;
+  NostrBunker: DurableObjectNamespace;
+}
+
+interface Session {
+  account_id: string;
+  created: number;
+  expires: number;
+}
+
+interface NIP46Request {
+  id: number | string;
+  method: string;
+  params: any[];
+}
+
+interface NIP46Response {
+  id: number | string;
+  result?: string;
+  error?: string;
+}
+
+interface NostrEvent {
+  pubkey: string;
+  created_at: number;
+  kind: number;
+  tags: string[][];
+  content: string;
+  id?: string;
+  sig?: string;
+}
+
+interface NearRPCResult {
+  result?: number[];
+  error?: { message: string };
+}
+
+interface NearRPCResponse {
+  jsonrpc: string;
+  id: number;
+  result?: {
+    result: number[];
+  };
+  error?: {
+    message: string;
+  };
+}
 
 // ============================================
 // CONFIGURATION
@@ -14,16 +69,21 @@ const NEAR_RPC = 'https://rpc.mainnet.near.org';
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // ============================================
-// WEBSOCKET PAIR FOR NIP-46
+// DURABLE OBJECT: BUNKER STATE
 // ============================================
 
-class NostrBunker {
-  constructor(state) {
+export class NostrBunker {
+  private state: DurableObjectState;
+  private env: Env;
+  private sessions: Map<string, Session>;
+
+  constructor(state: DurableObjectState, env: Env) {
     this.state = state;
+    this.env = env;
     this.sessions = new Map();
   }
 
-  async fetch(request) {
+  async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     
     // WebSocket upgrade for NIP-46
@@ -61,15 +121,15 @@ class NostrBunker {
   // WEBSOCKET HANDLER (NIP-46)
   // ============================================
 
-  handleWebSocket(ws, url) {
+  private handleWebSocket(ws: WebSocket, url: URL): void {
     const accountId = this.extractAccountId(url.pathname);
     
     ws.accept();
     
-    ws.addEventListener('message', async (event) => {
+    ws.addEventListener('message', async (event: MessageEvent) => {
       try {
-        const msg = JSON.parse(event.data);
-        const response = await this.handleNIP46Message(msg, accountId, ws);
+        const msg: NIP46Request = JSON.parse(event.data as string);
+        const response = await this.handleNIP46Message(msg, accountId);
         
         if (response) {
           ws.send(JSON.stringify(response));
@@ -77,8 +137,8 @@ class NostrBunker {
       } catch (error) {
         console.error('WebSocket error:', error);
         ws.send(JSON.stringify({
-          id: msg?.id,
-          error: 'Internal error: ' + error.message,
+          id: 'unknown',
+          error: 'Internal error: ' + (error as Error).message,
         }));
       }
     });
@@ -88,7 +148,10 @@ class NostrBunker {
     });
   }
 
-  async handleNIP46Message(msg, accountId, ws) {
+  private async handleNIP46Message(
+    msg: NIP46Request,
+    accountId: string
+  ): Promise<NIP46Response> {
     const { id, method, params } = msg;
     
     switch (method) {
@@ -99,10 +162,10 @@ class NostrBunker {
       }
       
       case 'sign_event': {
-        const event = params[0];
+        const event: NostrEvent = params[0];
         
         // Check authentication
-        const session = await this.state.storage.get(`session:${accountId}`);
+        const session = await this.state.storage.get<Session>(`session:${accountId}`);
         if (!session || session.expires < Date.now()) {
           return {
             id,
@@ -116,13 +179,11 @@ class NostrBunker {
       }
       
       case 'nip04_encrypt': {
-        const [pubkey, plaintext] = params;
         // Optional: Implement NIP-04 encryption
         return { id, error: 'NIP-04 encryption not implemented' };
       }
       
       case 'nip04_decrypt': {
-        const [pubkey, ciphertext] = params;
         // Optional: Implement NIP-04 decryption
         return { id, error: 'NIP-04 decryption not implemented' };
       }
@@ -136,7 +197,7 @@ class NostrBunker {
   // NEAR MPC INTEGRATION
   // ============================================
 
-  async getNostrPubkey(accountId) {
+  private async getNostrPubkey(accountId: string): Promise<string> {
     const response = await fetch(NEAR_RPC, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -157,17 +218,25 @@ class NostrBunker {
       }),
     });
     
-    const { result } = await response.json();
+    const data: NearRPCResponse = await response.json();
+    
+    if (data.error) {
+      throw new Error(`NEAR RPC error: ${data.error.message}`);
+    }
+    
+    if (!data.result) {
+      throw new Error('No result from NEAR RPC');
+    }
     
     // Convert byte array to hex
-    const pubkeyHex = result.result
-      .map(b => b.toString(16).padStart(2, '0'))
+    const pubkeyHex = data.result.result
+      .map((b: number) => b.toString(16).padStart(2, '0'))
       .join('');
     
     return pubkeyHex;
   }
 
-  async signWithMPC(accountId, event) {
+  private async signWithMPC(accountId: string, event: NostrEvent): Promise<string> {
     // 1. Serialize event (NIP-01)
     const serialized = JSON.stringify([
       0,
@@ -185,50 +254,44 @@ class NostrBunker {
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const eventHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     
-    // 3. Get relayer credentials from environment
-    const relayerAccountId = this.state.env.RELAYER_ACCOUNT_ID;
-    const relayerPrivateKey = this.state.env.RELAYER_PRIVATE_KEY;
+    // 3. Get relayer credentials
+    const relayerAccountId = this.env.RELAYER_ACCOUNT_ID;
+    const relayerPrivateKey = this.env.RELAYER_PRIVATE_KEY;
     
     if (!relayerAccountId || !relayerPrivateKey) {
       throw new Error('Relayer not configured');
     }
     
-    // 4. Sign via MPC (this requires NEAR API integration)
-    // For now, return placeholder - you'd need near-api-js here
+    // 4. Sign via MPC
     const signature = await this.callMPC(relayerAccountId, relayerPrivateKey, accountId, eventHash);
     
     return signature;
   }
 
-  async callMPC(relayerAccount, relayerKey, accountId, eventHash) {
+  private async callMPC(
+    relayerAccount: string,
+    relayerKey: string,
+    accountId: string,
+    eventHash: string
+  ): Promise<string> {
     // This would use near-api-js to call v1.signer
     // For production, you'd implement proper NEAR transaction signing
     
-    const response = await fetch(NEAR_RPC, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'broadcast_tx_commit',
-        params: [
-          // This would be a signed transaction calling v1.signer.sign()
-          // Requires proper transaction signing with near-api-js
-          // Placeholder for now
-        ],
-      }),
-    });
+    // TODO: Implement actual NEAR transaction signing
+    // This is a placeholder - you'd need to:
+    // 1. Create transaction calling v1.signer.sign()
+    // 2. Sign with relayer key
+    // 3. Broadcast to NEAR
+    // 4. Extract signature from response
     
-    // Extract signature from response
-    // This is simplified - actual implementation needs proper parsing
-    return 'signature_placeholder';
+    throw new Error('MPC signing not yet implemented - requires near-api-js integration');
   }
 
   // ============================================
   // AUTHENTICATION
   // ============================================
 
-  async handleAuth(url) {
+  private async handleAuth(url: URL): Promise<Response> {
     const accountId = url.pathname.split('/')[2];
     
     const html = `
@@ -348,11 +411,12 @@ class NostrBunker {
     });
   }
 
-  async handleCreateSession(request) {
-    const { account_id } = await request.json();
+  private async handleCreateSession(request: Request): Promise<Response> {
+    const body = await request.json() as { account_id: string };
+    const { account_id } = body;
     
     // Create session
-    const session = {
+    const session: Session = {
       account_id,
       created: Date.now(),
       expires: Date.now() + SESSION_DURATION_MS,
@@ -369,7 +433,7 @@ class NostrBunker {
   // HELPERS
   // ============================================
 
-  extractAccountId(pathname) {
+  private extractAccountId(pathname: string): string {
     // Extract from: /alice.near or /bunker/alice.near
     const parts = pathname.split('/').filter(p => p);
     return parts[parts.length - 1] || 'unknown';
@@ -377,7 +441,15 @@ class NostrBunker {
 }
 
 // ============================================
-// EXPORT FOR CLOUDFLARE WORKERS
+// WORKER ENTRY POINT
 // ============================================
 
-export { NostrBunker };
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    // Route to Durable Object
+    const id = env.NostrBunker.idFromName('bunker');
+    const stub = env.NostrBunker.get(id);
+    
+    return stub.fetch(request);
+  },
+};
