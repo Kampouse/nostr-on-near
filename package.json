@@ -1,0 +1,23 @@
+{
+  "name": "nostr-on-near",
+  "version": "1.0.0",
+  "description": "NEAR + Nostr Bunker Server - NIP-46 Remote Signer",
+  "main": "worker.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "keywords": [
+    "nostr",
+    "near",
+    "mpc",
+    "nip-46",
+    "bunker"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

@@ -1,0 +1,9 @@
+# Local Development Variables
+# Copy this to .dev.vars and fill in your values
+
+RELAYER_ACCOUNT_ID=your-relayer-account.near
+RELAYER_PRIVATE_KEY=ed25519:your_private_key_here
+
+# Get these from NEAR CLI:
+# near login
+# near generate-key relayer-account.near
