@@ -1,27 +1,41 @@
 name = "nostr-on-near"
 main = "worker.js"
 compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
 
-# Durable Objects for WebSocket and session state
-[[durable_objects.bindings]]
-name = "NostrBunker"
-class_name = "NostrBunker"
+# Durable Objects for WebSocket state
+[durable_objects]
+bindings = [
+  { name = "NostrBunker", class_name = "NostrBunker" }
+]
 
-# Migrations for Durable Objects
 [[migrations]]
 tag = "v1"
 new_classes = ["NostrBunker"]
 
-# Environment variables (set via wrangler secret)
-# wrangler secret put RELAYER_ACCOUNT_ID
-# wrangler secret put RELAYER_PRIVATE_KEY
+# Environment variables (set via: wrangler secret put <NAME>)
+# [vars]
+# Add non-sensitive vars here
 
-# Routes (optional - for custom domain)
+# Development
+[dev]
+port = 8787
+local_protocol = "http"
+
+# Production routes
 # routes = [
 #   { pattern = "bunker.yourdomain.com/*", zone_name = "yourdomain.com" }
 # ]
 
-# Development settings
-[dev]
-port = 8787
-local_protocol = "http"
+# Optional: Add custom domain
+# [[routes]]
+# pattern = "bunker.yourdomain.com/*"
+# zone_name = "yourdomain.com"
+
+# Limits
+[limits]
+cpu_ms = 50
+
+# Build
+[build]
+command = "npm run build"
