@@ -1,7 +1,7 @@
 {
   "name": "nostr-on-near",
   "version": "1.0.0",
-  "description": "NEAR + Nostr Bunker Server - NIP-46 Remote Signer (TypeScript)",
+  "description": "NEAR + Nostr integration - NIP-46 bunker server for gasless Nostr identities (TypeScript)",
   "main": "worker.ts",
   "scripts": {
     "dev": "wrangler dev",
@@ -9,6 +9,7 @@
     "tail": "wrangler tail",
     "build": "tsc --noEmit",
     "type-check": "tsc --noEmit"
+    "test": "ts-node test-client.ts"
   },
   "keywords": [
     "nostr",
@@ -23,6 +24,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240117.0",
     "typescript": "^5.3.3",
+    "@types/ws": "^8.5.10",
     "wrangler": "^3.24.0"
   },
   "dependencies": {}
